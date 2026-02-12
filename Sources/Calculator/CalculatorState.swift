@@ -7,11 +7,11 @@ struct HistoryEntry: Identifiable, Codable, Sendable {
     let result: Double
     let formattedResult: String
 
-    init(expression: String, result: Double) {
+    init(expression: String, result: Double, formattedResult: String? = nil) {
         self.id = UUID()
         self.expression = expression
         self.result = result
-        self.formattedResult = NumberFormatterExt.format(result)
+        self.formattedResult = formattedResult ?? NumberFormatterExt.format(result)
     }
 }
 
@@ -24,6 +24,7 @@ final class CalculatorState {
     var isValid: Bool = false
     var history: [HistoryEntry] = []
     var copiedEntryID: UUID? = nil
+    private var _variablesRevision: Int = 0
 
     // MARK: - Window settings
 
@@ -37,12 +38,21 @@ final class CalculatorState {
 
     let context: EvalContext
     private let historyRepo = Repository<[HistoryEntry]>(key: "calculator.history")
-    private let variablesRepo = Repository<[String: Double]>(key: "calculator.variables")
+    private let variablesRepo = Repository<[String: VariableValue]>(key: "calculator.variables.v2")
+    private let legacyVariablesRepo = Repository<[String: Double]>(key: "calculator.variables")
     private let memoryRepo = Repository<Double>(key: "calculator.memory")
     private let settingsRepo = Repository<CalculatorSettings>(key: "calculator.settings")
 
     init() {
-        let savedVars = variablesRepo.load() ?? [:]
+        // Load saved variables (v2 format preserves percentage type, fall back to legacy)
+        let savedVars: [String: VariableValue]
+        if let vars = variablesRepo.load() {
+            savedVars = vars
+        } else if let legacyVars = legacyVariablesRepo.load() {
+            savedVars = legacyVars.mapValues { .number($0) }
+        } else {
+            savedVars = [:]
+        }
         let savedMemory = memoryRepo.load() ?? 0
         self.context = EvalContext(variables: savedVars, memory: savedMemory)
         self.history = historyRepo.load() ?? []
@@ -70,7 +80,7 @@ final class CalculatorState {
         let ctx = context.copy()
         do {
             let result = try Evaluator.evaluate(trimmed, context: ctx)
-            liveResult = NumberFormatterExt.format(result)
+            liveResult = NumberFormatterExt.formatResult(result, isPercentage: ctx.lastResultIsPercentage)
             isValid = true
         } catch {
             liveResult = "N/A"
@@ -86,10 +96,12 @@ final class CalculatorState {
 
         do {
             let result = try Evaluator.evaluate(trimmed, context: context)
-            let entry = HistoryEntry(expression: trimmed, result: result)
+            let formatted = NumberFormatterExt.formatResult(result, isPercentage: context.lastResultIsPercentage)
+            let entry = HistoryEntry(expression: trimmed, result: result, formattedResult: formatted)
             history.insert(entry, at: 0)
             if history.count > 200 { history = Array(history.prefix(200)) }
             persistHistory()
+            _variablesRevision += 1
             persistVariables()
             input = ""
             liveResult = nil
@@ -149,26 +161,50 @@ final class CalculatorState {
     // MARK: - Variable management
 
     var variableNames: Set<String> {
-        Set(context.variables.keys)
+        _ = _variablesRevision
+        return Set(context.variables.keys)
     }
 
-    var sortedVariables: [(name: String, value: Double)] {
-        context.variables.sorted { $0.key < $1.key }.map { (name: $0.key, value: $0.value) }
+    var sortedVariables: [(name: String, value: Double, isPercentage: Bool)] {
+        _ = _variablesRevision
+        return context.variables.map { (name: $0.key, value: $0.value.value, isPercentage: $0.value.isPercentage) }
+            .sorted { $0.name < $1.name }
+    }
+
+    func formattedVariableValue(_ name: String) -> String {
+        _ = _variablesRevision
+        guard let varValue = context.variables[name] else { return "0" }
+        if varValue.isPercentage {
+            return "\(NumberFormatterExt.format(varValue.value * 100))%"
+        }
+        return NumberFormatterExt.format(varValue.value)
     }
 
     func setVariable(_ name: String, _ value: Double) {
-        context.variables[name] = value
+        context.variables[name] = .number(value)
+        _variablesRevision += 1
+        persistVariables()
+    }
+
+    func setVariableFromExpression(_ name: String, _ expression: String) {
+        let ctx = context.copy()
+        guard let value = try? Evaluator.evaluate(expression, context: ctx) else { return }
+        context.variables[name] = ctx.lastResultIsPercentage ? .percentage(value) : .number(value)
+        _variablesRevision += 1
         persistVariables()
     }
 
     func removeVariable(_ name: String) {
         context.variables.removeValue(forKey: name)
+        _variablesRevision += 1
         persistVariables()
     }
 
     // MARK: - Persistence
 
     private func persistHistory() { historyRepo.save(history) }
-    private func persistVariables() { variablesRepo.save(context.variables) }
+    private func persistVariables() {
+        variablesRepo.save(context.variables)
+    }
     private func persistMemory() { memoryRepo.save(context.memory) }
 }

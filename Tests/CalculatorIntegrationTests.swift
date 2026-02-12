@@ -6,7 +6,8 @@ struct CalculatorIntegrationTests {
 
     /// End-to-end: string in → result out via Evaluator
     private func eval(_ input: String, vars: [String: Double] = [:]) throws -> Double {
-        try Evaluator.evaluate(input, context: EvalContext(variables: vars))
+        let convertedVars = vars.mapValues { VariableValue.number($0) }
+        return try Evaluator.evaluate(input, context: EvalContext(variables: convertedVars))
     }
 
     @Test("Full pipeline: 5 + 30% = 6.5")

@@ -81,6 +81,6 @@ struct ParserTests {
         let node = try parse("$x = 42")
         let result = try node.evaluate(context: ctx)
         #expect(result == 42)
-        #expect(ctx.variables["x"] == 42)
+        #expect(ctx.variables["x"]?.value == 42)
     }
 }

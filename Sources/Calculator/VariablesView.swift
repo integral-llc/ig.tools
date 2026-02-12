@@ -47,7 +47,7 @@ struct VariablesView: View {
     }
 
     @ViewBuilder
-    private func variableRow(_ variable: (name: String, value: Double)) -> some View {
+    private func variableRow(_ variable: (name: String, value: Double, isPercentage: Bool)) -> some View {
         HStack {
             Text("$\(variable.name)")
                 .font(.system(.body, design: .monospaced))
@@ -63,7 +63,7 @@ struct VariablesView: View {
                     .onSubmit { commitEdit(variable.name) }
                     .onExitCommand { editingName = nil }
             } else {
-                Text(NumberFormatterExt.format(variable.value))
+                Text(formatVariable(variable))
                     .font(.system(.body, design: .monospaced))
                     .foregroundStyle(.secondary)
                     .onTapGesture {
@@ -78,17 +78,28 @@ struct VariablesView: View {
             } label: {
                 Image(systemName: "xmark.circle.fill")
                     .foregroundStyle(.secondary)
+                    .padding(4) // Increase tap area
             }
             .buttonStyle(.plain)
+            .contentShape(Rectangle()) // Make entire area tappable
+            .allowsHitTesting(true) // Ensure button receives taps
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 4)
     }
 
+    private func formatVariable(_ variable: (name: String, value: Double, isPercentage: Bool)) -> String {
+        if variable.isPercentage {
+            return "\(NumberFormatterExt.format(variable.value * 100))%"
+        } else {
+            return NumberFormatterExt.format(variable.value)
+        }
+    }
+
     private func commitEdit(_ name: String) {
         let trimmed = editText.trimmingCharacters(in: .whitespaces)
-        if let value = evaluateExpression(trimmed) {
-            state.setVariable(name, value)
+        if evaluateExpression(trimmed) != nil {
+            state.setVariableFromExpression(name, trimmed)
         }
         editingName = nil
     }
@@ -127,8 +138,8 @@ struct VariablesView: View {
     private func addVariable() {
         let name = newName.trimmingCharacters(in: .whitespaces)
         let valueStr = newValue.trimmingCharacters(in: .whitespaces)
-        guard !name.isEmpty, let value = evaluateExpression(valueStr) else { return }
-        state.setVariable(name, value)
+        guard !name.isEmpty, evaluateExpression(valueStr) != nil else { return }
+        state.setVariableFromExpression(name, valueStr)
         newName = ""
         newValue = ""
     }

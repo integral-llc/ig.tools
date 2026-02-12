@@ -128,7 +128,7 @@ struct EvaluatorTests {
 
     @Test("Variable usage")
     func variables() throws {
-        let ctx = EvalContext(variables: ["tax": 8.5])
+        let ctx = EvalContext(variables: ["tax": .number(8.5)])
         #expect(try eval("$tax * 100", context: ctx) == 850)
     }
 

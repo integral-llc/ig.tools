@@ -34,6 +34,7 @@ enum Evaluator {
         let trimmed = input.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { throw ExpressionError.unexpectedToken }
 
+        context.lastResultIsPercentage = false
         var lexer = Lexer(trimmed)
         let tokens = try lexer.tokenize()
         var parser = Parser(tokens: tokens)

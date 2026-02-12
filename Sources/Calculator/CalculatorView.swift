@@ -61,7 +61,7 @@ struct CalculatorView: View {
                             .font(.system(.caption, design: .monospaced))
                             .foregroundStyle(.green)
                         Spacer()
-                        Text(NumberFormatterExt.format(state.context.variables[name] ?? 0))
+                        Text(state.formattedVariableValue(name))
                             .font(.system(.caption, design: .monospaced))
                             .foregroundStyle(.secondary)
                     }

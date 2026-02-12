@@ -2,6 +2,13 @@ import Foundation
 
 /// Smart number formatting: strips trailing zeros, caps decimal places.
 enum NumberFormatterExt {
+    static func formatResult(_ value: Double, isPercentage: Bool) -> String {
+        if isPercentage {
+            return "\(format(value * 100))%"
+        }
+        return format(value)
+    }
+
     static func format(_ value: Double) -> String {
         if value.isInfinite { return value > 0 ? "∞" : "-∞" }
         if value.isNaN { return "NaN" }
