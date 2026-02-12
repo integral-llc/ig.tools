@@ -1,0 +1,11 @@
+import AppKit
+
+/// Wraps NSPasteboard for easy copy-to-clipboard.
+enum ClipboardService {
+    @MainActor
+    static func copy(_ string: String) {
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setString(string, forType: .string)
+    }
+}

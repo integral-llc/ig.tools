@@ -1,0 +1,67 @@
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# Custom build output
+build/
+
+# Xcode
+*.xcodeproj/
+*.xcworkspace/
+*.xcuserdata/
+*.xcuserstate
+DerivedData/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+*.swp
+*.lock
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# OS
+Thumbs.db
+Desktop.ini
+
+# Logs
+*.log
+*.log.*
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Application specific
+*.app
+*.dSYM
+
+# Swift Package Manager - specific
+Packages/
+xcuserdata/
+*.xcodeproj
+*.xcworkspace
+
+# Test coverage
+*.profdata
+*.xcresult
+
+# CocoaPods (if used)
+Pods/
+*.xcworkspace
+
+# Carthage (if used)
+Carthage/Build/
+Carthage/Checkouts/
