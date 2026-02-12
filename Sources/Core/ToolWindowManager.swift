@@ -26,6 +26,10 @@ final class ToolWindowManager {
     static let shared = ToolWindowManager()
     private init() {}
 
+    // MARK: - Constants
+    private static let windowPadding: CGFloat = 12
+    private let defaultWindowSize = CGSize(width: 360, height: 440)
+
     private var windows: [String: NSWindow] = [:]
 
     func toggleWindow(for tool: any Tool) {
@@ -48,8 +52,8 @@ final class ToolWindowManager {
         hostingView.setFrameSize(hostingView.fittingSize)
 
         let window = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 360, height: 440),
-            styleMask: [.titled, .closable, .nonactivatingPanel, .utilityWindow],
+            contentRect: NSRect(x: 0, y: 0, width: defaultWindowSize.width, height: defaultWindowSize.height),
+            styleMask: [.titled, .closable, .resizable, .nonactivatingPanel, .utilityWindow],
             backing: .buffered,
             defer: false
         )
@@ -103,8 +107,8 @@ final class ToolWindowManager {
         }
         let visible = screen.visibleFrame
         let size = window.frame.size
-        let x = visible.maxX - size.width - 12
-        let y = visible.maxY - size.height - 12
+        let x = visible.maxX - size.width - ToolWindowManager.windowPadding
+        let y = visible.maxY - size.height - ToolWindowManager.windowPadding
         window.setFrameOrigin(NSPoint(x: x, y: y))
     }
 

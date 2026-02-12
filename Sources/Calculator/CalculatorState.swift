@@ -42,12 +42,12 @@ final class CalculatorState {
     private let settingsRepo = Repository<CalculatorSettings>(key: "calculator.settings")
 
     init() {
-        let savedVars = Repository<[String: Double]>(key: "calculator.variables").load() ?? [:]
-        let savedMemory = Repository<Double>(key: "calculator.memory").load() ?? 0
+        let savedVars = variablesRepo.load() ?? [:]
+        let savedMemory = memoryRepo.load() ?? 0
         self.context = EvalContext(variables: savedVars, memory: savedMemory)
-        self.history = Repository<[HistoryEntry]>(key: "calculator.history").load() ?? []
+        self.history = historyRepo.load() ?? []
 
-        let settings = Repository<CalculatorSettings>(key: "calculator.settings").load() ?? CalculatorSettings()
+        let settings = settingsRepo.load() ?? CalculatorSettings()
         self.opacity = settings.opacity
         self.alwaysOnTop = settings.alwaysOnTop
     }
@@ -95,7 +95,8 @@ final class CalculatorState {
             liveResult = nil
             isValid = false
         } catch {
-            // Should not happen since isValid was true
+            assertionFailure("Evaluation failed after validation: \(error)")
+            print("Unexpected evaluation error: \(error)")
         }
     }
 
@@ -115,13 +116,26 @@ final class CalculatorState {
 
     // MARK: - Clipboard
 
+    private var copyIndicatorTasks: [UUID?: Task<Void, Never>] = [:]
+
     func copyResult(_ text: String, entryID: UUID? = nil) {
         ClipboardService.copy(text)
         copiedEntryID = entryID
-        // Reset copied indicator after delay
-        Task { @MainActor in
-            try? await Task.sleep(for: .seconds(1.5))
-            if copiedEntryID == entryID { copiedEntryID = nil }
+
+        // Cancel existing task for this entry
+        copyIndicatorTasks[entryID]?.cancel()
+
+        // Create new task
+        copyIndicatorTasks[entryID] = Task { @MainActor in
+            do {
+                try await Task.sleep(for: .seconds(1.5))
+                if !Task.isCancelled && copiedEntryID == entryID {
+                    copiedEntryID = nil
+                }
+            } catch {
+                // Task was cancelled
+            }
+            copyIndicatorTasks.removeValue(forKey: entryID)
         }
     }
 
