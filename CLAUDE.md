@@ -19,7 +19,18 @@ swift build -c release
 
 ### Run Tests
 ```bash
+# Run all tests
 swift test
+
+# Run specific test suite
+swift test --filter LexerTests
+swift test --filter ParserTests
+swift test --filter EvaluatorTests
+swift test --filter CalculatorIntegrationTests
+swift test --filter PercentageVariableTests
+
+# Run a specific test
+swift test --filter "LexerTests/basicTokens"
 ```
 
 ### Run the Application
@@ -52,15 +63,21 @@ The calculator is a sophisticated expression evaluator with:
 1. **Lexer** (`Sources/Calculator/Lexer/`): Tokenizes input text into tokens (numbers, operators, functions, variables)
 2. **Parser** (`Sources/Calculator/Parser/`): Builds an Abstract Syntax Tree (AST) from tokens
 3. **Evaluator** (`Sources/Calculator/Evaluator/`): Evaluates AST nodes with variable context and function implementations
-4. **State Management** (`Sources/Calculator/CalculatorState.swift`): Manages calculator state, history, variables, and persistence
+4. **State Management** (`Sources/Calculator/CalculatorState.swift`): Manages calculator state, history, variables, and memory
 
 Key features:
 - Live evaluation as you type
-- Variable assignment and management (`x = 5`, `y = x * 2`)
+- Variable assignment and management (`$x = 5`, `$y = $x * 2`)
 - Function support (`sin`, `cos`, `sqrt`, `log`, etc.)
 - Memory operations (M+, M-, MR, MC, MS)
 - History tracking with copy-to-clipboard
 - Syntax highlighting in input field
+
+### Percentage System
+The calculator has special support for percentages:
+- Standalone: `30%` evaluates to `0.3`
+- Trailing: `5 + 30%` evaluates to `6.5` (adds 30% of 5)
+- Variables can be marked as percentage type, displayed as `30%` but stored as `0.3`
 
 ### Persistence
 All state is persisted to `UserDefaults` via the `Repository` class:
@@ -110,6 +127,7 @@ Tests are organized by component:
 - `ParserTests`: AST construction
 - `EvaluatorTests`: Expression evaluation
 - `CalculatorIntegrationTests`: End-to-end calculator functionality
+- `PercentageVariableTests`: Percentage variable handling
 
 Run individual test suites:
 ```bash
@@ -117,6 +135,7 @@ swift test --filter LexerTests
 swift test --filter ParserTests
 swift test --filter EvaluatorTests
 swift test --filter CalculatorIntegrationTests
+swift test --filter PercentageVariableTests
 ```
 
 ## Code Style and Conventions
@@ -126,3 +145,33 @@ swift test --filter CalculatorIntegrationTests
 - **Observable**: State classes use `@Observable` for SwiftUI integration
 - **Naming**: Descriptive names with clear separation of concerns
 - **Error Handling**: Calculator uses `throws` for expression evaluation errors
+
+## Common Development Tasks
+
+### Debugging
+- Use `print()` statements for quick debugging
+- Check Console.app for runtime logs
+- Use Xcode debugger when needed
+
+### Adding New Functions to Calculator
+1. Add function name to `Functions.swift` in the `functions` dictionary
+2. Implement the function logic
+3. Add tests to `EvaluatorTests.swift`
+
+### Adding New Operators
+1. Add token type to `Token.swift`
+2. Update `Lexer.swift` to recognize the operator
+3. Update `Parser.swift` to handle precedence and associativity
+4. Update `Evaluator.swift` to evaluate the operator
+5. Add tests for the new operator
+
+### Modifying UI Components
+- Calculator view: `CalculatorView.swift`
+- Settings view: `CalculatorSettingsView.swift`
+- History view: `HistoryView.swift`
+- Variables view: `VariablesView.swift`
+
+### Working with State
+- Calculator state: `CalculatorState.swift`
+- Shared state patterns use `@Observable` classes
+- State persistence uses `UserDefaults` via `Repository` class

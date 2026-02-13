@@ -17,4 +17,32 @@ mkdir -p "${MACOS_DIR}" "${RESOURCES_DIR}"
 cp .build/release/IGTools "${MACOS_DIR}/IGTools"
 cp Resources/Info.plist "${CONTENTS_DIR}/Info.plist"
 
+# Copy resource files if they exist
+if [ -d "Resources" ]; then
+    # Copy all files except Info.plist and Assets.xcassets
+    find Resources -mindepth 1 -maxdepth 1 ! -name "Info.plist" ! -name "Assets.xcassets" -exec cp -r {} "${RESOURCES_DIR}/" \; 2>/dev/null || true
+
+    # Handle Assets.xcassets separately - try to compile them
+    if [ -d "Resources/Assets.xcassets" ]; then
+        # Try to compile the asset catalog with actool
+        if command -v actool &> /dev/null; then
+            echo "Compiling asset catalog..."
+            actool --compile "${RESOURCES_DIR}" \
+                   --platform macosx \
+                   --minimum-deployment-target 14.0 \
+                   --output-format human-readable-text \
+                   --app-icon AppIcon \
+                   --output-partial-info-plist "${RESOURCES_DIR}/assetcatalog_generated_info.plist" \
+                   Resources/Assets.xcassets 2>/dev/null || {
+                # If compilation fails, fall back to copying the assets
+                echo "Failed to compile assets, copying instead..."
+                cp -r Resources/Assets.xcassets "${RESOURCES_DIR}/"
+            }
+        else
+            # actool not available, just copy the assets
+            cp -r Resources/Assets.xcassets "${RESOURCES_DIR}/"
+        fi
+    fi
+fi
+
 echo "Done → ${BUNDLE_DIR}"
