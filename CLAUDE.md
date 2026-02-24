@@ -4,174 +4,74 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-IG Tools is a macOS menu bar application built with SwiftUI that provides floating utility tools. Currently features a calculator with expression parsing, variable management, and history tracking.
+IG Tools is a macOS 14+ menu bar application built with SwiftUI that provides floating utility tools. Currently features a calculator with expression parsing, variable management, and history tracking. Uses Swift 6 strict concurrency.
 
 ## Build and Run
 
-### Build the Application
 ```bash
-# Build using Swift Package Manager
-swift build -c release
+swift build -c release          # Build with SwiftPM
+./build.sh                      # Build .app bundle (into build/IG Tools.app)
+./.build/release/IGTools        # Run after SwiftPM build
+open "build/IG Tools.app"       # Run after build.sh
 
-# Or use the build script to create a .app bundle
-./build.sh
+swift test                                      # Run all tests
+swift test --filter LexerTests                  # Run a test suite
+swift test --filter "LexerTests/basicTokens"    # Run a single test
 ```
 
-### Run Tests
-```bash
-# Run all tests
-swift test
+Test suites: `LexerTests`, `ParserTests`, `EvaluatorTests`, `CalculatorIntegrationTests`, `PercentageVariableTests`
 
-# Run specific test suite
-swift test --filter LexerTests
-swift test --filter ParserTests
-swift test --filter EvaluatorTests
-swift test --filter CalculatorIntegrationTests
-swift test --filter PercentageVariableTests
-
-# Run a specific test
-swift test --filter "LexerTests/basicTokens"
-```
-
-### Run the Application
-```bash
-# After building with SwiftPM
-./.build/release/IGTools
-
-# Or after building with build.sh
-open "build/IG Tools.app"
-```
+Tests use **Swift Testing** framework (`@Test`, `@Suite`, `#expect`), not XCTest.
 
 ## Architecture
 
 ### Tool System (Strategy Pattern)
-The application uses a plugin-like architecture where each utility is a "tool" conforming to the `Tool` protocol:
+Each utility is a "tool" conforming to the `Tool` protocol (`Sources/Core/Protocols/Tool.swift`):
+- `ToolRegistry` (`Sources/Core/ToolRegistry.swift`) — discovers and manages tools
+- `ToolWindowManager` (`Sources/Core/ToolWindowManager.swift`) — manages floating `NSPanel` windows per tool
+- Tools are registered in `AppDelegate.setupRegistry()`
+- Each tool provides its own view, settings view, opacity, and always-on-top setting
+- Window frames auto-persist via `Repository<SavedFrame>`
 
-- **Tool Protocol** (`Sources/Core/Protocols/Tool.swift`): Defines the interface for all tools
-- **ToolRegistry** (`Sources/Core/ToolRegistry.swift`): Discovers and manages available tools
-- **ToolWindowManager** (`Sources/Core/ToolWindowManager.swift`): Manages floating windows for each tool
+The app entry point (`Sources/App/IGToolsApp.swift`) is a `MenuBarExtra` that toggles tool windows.
 
-Each tool provides:
-- Unique ID, name, and SF Symbol icon
-- View and settings view via SwiftUI
-- Window opacity and "always on top" settings
-- Automatic frame persistence
+### Calculator Pipeline
+The calculator follows a classic **Lexer → Parser → Evaluator** pipeline:
 
-### Calculator Architecture
-The calculator is a sophisticated expression evaluator with:
+1. **Lexer** (`Sources/Calculator/Lexer/`) — tokenizes input into `Token` values
+2. **Parser** (`Sources/Calculator/Parser/`) — builds an AST (`ASTNode` tree) from tokens
+3. **Evaluator** (`Sources/Calculator/Evaluator/`) — tree-walks the AST with an `EvalContext` (variables, memory, functions)
 
-1. **Lexer** (`Sources/Calculator/Lexer/`): Tokenizes input text into tokens (numbers, operators, functions, variables)
-2. **Parser** (`Sources/Calculator/Parser/`): Builds an Abstract Syntax Tree (AST) from tokens
-3. **Evaluator** (`Sources/Calculator/Evaluator/`): Evaluates AST nodes with variable context and function implementations
-4. **State Management** (`Sources/Calculator/CalculatorState.swift`): Manages calculator state, history, variables, and memory
-
-Key features:
-- Live evaluation as you type
-- Variable assignment and management (`$x = 5`, `$y = $x * 2`)
-- Function support (`sin`, `cos`, `sqrt`, `log`, etc.)
-- Memory operations (M+, M-, MR, MC, MS)
-- History tracking with copy-to-clipboard
-- Syntax highlighting in input field
+`CalculatorState` orchestrates the pipeline: live-evaluates on keystroke (using a copied context to avoid side effects), commits on submit (mutating the real context).
 
 ### Percentage System
-The calculator has special support for percentages:
-- Standalone: `30%` evaluates to `0.3`
-- Trailing: `5 + 30%` evaluates to `6.5` (adds 30% of 5)
-- Variables can be marked as percentage type, displayed as `30%` but stored as `0.3`
+- Standalone: `30%` → `0.3`
+- Trailing: `5 + 30%` → `6.5` (adds 30% of 5)
+- Variables track percentage type via `VariableValue` enum (`.number` vs `.percentage`), displayed as `30%` but stored as `0.3`
 
 ### Persistence
-All state is persisted to `UserDefaults` via the `Repository` class:
-- Calculator history, variables, and memory
-- Window positions for each tool
-- Tool-specific settings (opacity, always on top)
+`Repository<T: Codable>` (`Sources/Core/Persistence.swift`) — generic JSON-encoded `UserDefaults` storage. Used for history, variables, memory, settings, and window frames.
 
 ### Dependencies
-- **KeyboardShortcuts** (Sindre Sorhus): For global hotkey support
+- **KeyboardShortcuts** (Sindre Sorhus) — global hotkey support
 
 ## Adding New Tools
 
-To add a new tool:
-
 1. Create a new directory under `Sources/` for your tool
-2. Create a struct conforming to `Tool` protocol
-3. Implement the required properties and methods
-4. Register the tool in `AppDelegate.setupRegistry()`
-5. Add any necessary settings and state management
+2. Create a struct conforming to `Tool` protocol (ID, name, icon, view, settings view)
+3. Register in `AppDelegate.setupRegistry()`
+4. Use `Repository<T>` for any persistent state
 
-Example structure:
-```swift
-struct MyTool: Tool {
-    let id = "mytool"
-    let name = "My Tool"
-    let icon = "star"
+## Adding Calculator Functions/Operators
 
-    @MainActor var opacity: Double { state.opacity }
-    @MainActor var alwaysOnTop: Bool { state.alwaysOnTop }
+**New function**: Add to the `functions` dictionary in `Sources/Calculator/Evaluator/Functions.swift`, then add tests to `Tests/EvaluatorTests.swift`.
 
-    @MainActor
-    func makeView() -> AnyView {
-        AnyView(MyToolView(state: state))
-    }
+**New operator**: Update `Token.swift` → `Lexer.swift` → `Parser.swift` (handle precedence) → `Evaluator.swift`, then add tests.
 
-    @MainActor
-    func makeSettingsView() -> AnyView {
-        AnyView(MyToolSettingsView(state: state))
-    }
-}
-```
+## Code Conventions
 
-## Testing
-
-Tests are organized by component:
-- `LexerTests`: Tokenization logic
-- `ParserTests`: AST construction
-- `EvaluatorTests`: Expression evaluation
-- `CalculatorIntegrationTests`: End-to-end calculator functionality
-- `PercentageVariableTests`: Percentage variable handling
-
-Run individual test suites:
-```bash
-swift test --filter LexerTests
-swift test --filter ParserTests
-swift test --filter EvaluatorTests
-swift test --filter CalculatorIntegrationTests
-swift test --filter PercentageVariableTests
-```
-
-## Code Style and Conventions
-
-- **MainActor**: All UI-related code and tool implementations use `@MainActor`
-- **Sendable**: Protocol conformances include `Sendable` where appropriate for thread safety
-- **Observable**: State classes use `@Observable` for SwiftUI integration
-- **Naming**: Descriptive names with clear separation of concerns
-- **Error Handling**: Calculator uses `throws` for expression evaluation errors
-
-## Common Development Tasks
-
-### Debugging
-- Use `print()` statements for quick debugging
-- Check Console.app for runtime logs
-- Use Xcode debugger when needed
-
-### Adding New Functions to Calculator
-1. Add function name to `Functions.swift` in the `functions` dictionary
-2. Implement the function logic
-3. Add tests to `EvaluatorTests.swift`
-
-### Adding New Operators
-1. Add token type to `Token.swift`
-2. Update `Lexer.swift` to recognize the operator
-3. Update `Parser.swift` to handle precedence and associativity
-4. Update `Evaluator.swift` to evaluate the operator
-5. Add tests for the new operator
-
-### Modifying UI Components
-- Calculator view: `CalculatorView.swift`
-- Settings view: `CalculatorSettingsView.swift`
-- History view: `HistoryView.swift`
-- Variables view: `VariablesView.swift`
-
-### Working with State
-- Calculator state: `CalculatorState.swift`
-- Shared state patterns use `@Observable` classes
-- State persistence uses `UserDefaults` via `Repository` class
+- **Swift 6 concurrency**: `@MainActor` on all UI code and tool implementations; `Sendable` conformance where needed
+- **`@Observable`** for state classes (SwiftUI integration)
+- **`nonisolated(unsafe)`** used sparingly for bridging to non-Sendable types (e.g., `UserDefaults`)
+- **4-space indentation**, opening braces on same line
+- Use `EvalContext.copy()` for live evaluation to isolate side effects from the real context
