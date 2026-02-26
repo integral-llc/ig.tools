@@ -2,29 +2,42 @@ import SwiftUI
 
 struct TextShortcutsView: View {
     @Bindable var state: TextShortcutsState
+    @State private var selectedID: UUID?
 
     var body: some View {
-        VStack(spacing: 0) {
-            topBar
-            Divider()
-            shortcutList
+        HSplitView {
+            sidebarPanel
+                .frame(minWidth: 160, idealWidth: 180, maxWidth: 240)
+            detailPanel
+                .frame(minWidth: 280, maxWidth: .infinity)
         }
     }
 
-    // MARK: - Top bar
+    // MARK: - Sidebar
 
-    private var topBar: some View {
+    private var sidebarPanel: some View {
+        VStack(spacing: 0) {
+            sidebarToolbar
+            Divider()
+            sidebarList
+        }
+        .background(Color.primary.opacity(0.02))
+    }
+
+    private var sidebarToolbar: some View {
         HStack {
-            Toggle("Enabled", isOn: $state.isEnabled)
+            Toggle("", isOn: $state.isEnabled)
                 .toggleStyle(.switch)
                 .controlSize(.small)
+                .labelsHidden()
 
             Spacer()
 
             accessibilityIndicator
 
             Button {
-                state.addShortcut()
+                let shortcut = state.addShortcut()
+                selectedID = shortcut.id
             } label: {
                 Image(systemName: "plus")
             }
@@ -32,6 +45,17 @@ struct TextShortcutsView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
+    }
+
+    private var sidebarList: some View {
+        List(selection: $selectedID) {
+            ForEach(state.shortcuts) { shortcut in
+                ShortcutSidebarRow(shortcut: shortcut)
+                    .tag(shortcut.id)
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
     }
 
     @ViewBuilder
@@ -54,74 +78,140 @@ struct TextShortcutsView: View {
         }
     }
 
-    // MARK: - Shortcut list
+    // MARK: - Detail
 
-    private var shortcutList: some View {
-        ScrollView {
-            LazyVStack(spacing: 0) {
-                if state.shortcuts.isEmpty {
-                    Text("No shortcuts defined.\nClick + to add one.")
+    private var detailPanel: some View {
+        Group {
+            if let selectedID,
+               let index = state.shortcuts.firstIndex(where: { $0.id == selectedID }) {
+                ShortcutDetailView(
+                    shortcut: $state.shortcuts[index],
+                    onDelete: { deleteShortcut(at: index) }
+                )
+            } else {
+                VStack(spacing: 8) {
+                    Image(systemName: "text.cursor")
+                        .font(.system(size: 32))
+                        .foregroundStyle(.tertiary)
+                    Text("Select a shortcut or click + to create one")
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                         .multilineTextAlignment(.center)
-                        .padding(.vertical, 40)
-                        .frame(maxWidth: .infinity)
-                } else {
-                    ForEach($state.shortcuts) { $shortcut in
-                        ShortcutCardView(shortcut: $shortcut) {
-                            state.removeShortcut(shortcut)
-                        }
-                        Divider()
-                    }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .frame(maxHeight: .infinity)
+    }
+
+    private func deleteShortcut(at index: Int) {
+        state.removeShortcut(state.shortcuts[index])
+        if state.shortcuts.isEmpty {
+            selectedID = nil
+        } else if index < state.shortcuts.count {
+            selectedID = state.shortcuts[index].id
+        } else {
+            selectedID = state.shortcuts.last?.id
+        }
     }
 }
 
-// MARK: - Shortcut card
+// MARK: - Sidebar row
 
-private struct ShortcutCardView: View {
+private struct ShortcutSidebarRow: View {
+    let shortcut: TextShortcut
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(shortcut.trigger.isEmpty ? "New Shortcut" : shortcut.trigger)
+                    .font(.system(.body, design: .monospaced))
+                    .lineLimit(1)
+                    .foregroundStyle(shortcut.trigger.isEmpty ? .tertiary : .primary)
+
+                if !shortcut.replacement.isEmpty {
+                    Text(shortcut.replacement)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer()
+
+            if !shortcut.isEnabled {
+                Image(systemName: "pause.circle")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .padding(.vertical, 2)
+        .opacity(shortcut.isEnabled ? 1.0 : 0.5)
+    }
+}
+
+// MARK: - Detail view
+
+private struct ShortcutDetailView: View {
     @Binding var shortcut: TextShortcut
     let onDelete: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
+        VStack(alignment: .leading, spacing: 0) {
+            detailToolbar
+            Divider()
+            detailContent
+            Spacer()
+        }
+    }
+
+    private var detailToolbar: some View {
+        HStack {
+            Toggle("Enabled", isOn: $shortcut.isEnabled)
+                .toggleStyle(.switch)
+                .controlSize(.small)
+
+            Spacer()
+
+            Button(action: onDelete) {
+                Image(systemName: "trash")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Delete shortcut")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+    }
+
+    private var detailContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text("Trigger")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Spacer()
-                Toggle("", isOn: $shortcut.isEnabled)
-                    .toggleStyle(.switch)
-                    .controlSize(.mini)
-                    .labelsHidden()
-                Button(action: onDelete) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
+
+                TextField("e.g. ;email", text: $shortcut.trigger)
+                    .textFieldStyle(.plain)
+                    .font(.system(.body, design: .monospaced))
+                    .padding(6)
+                    .background(Color.primary.opacity(0.04))
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
             }
 
-            TextField("e.g. ;email", text: $shortcut.trigger)
-                .textFieldStyle(.plain)
-                .font(.system(.body, design: .monospaced))
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Replacement")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
 
-            Text("Replacement")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(.top, 2)
-
-            TextEditor(text: $shortcut.replacement)
-                .font(.system(.body, design: .monospaced))
-                .frame(minHeight: 40, maxHeight: 80)
-                .scrollContentBackground(.hidden)
-                .background(Color.primary.opacity(0.04))
-                .clipShape(RoundedRectangle(cornerRadius: 4))
+                TextEditor(text: $shortcut.replacement)
+                    .font(.system(.body, design: .monospaced))
+                    .scrollContentBackground(.hidden)
+                    .padding(4)
+                    .background(Color.primary.opacity(0.04))
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                    .frame(minHeight: 120, maxHeight: .infinity)
+            }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .opacity(shortcut.isEnabled ? 1.0 : 0.5)
+        .padding(12)
     }
 }

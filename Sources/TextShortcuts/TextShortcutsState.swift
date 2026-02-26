@@ -24,6 +24,10 @@ final class TextShortcutsState {
         didSet { persistSettings() }
     }
 
+    var playSoundOnExpansion: Bool {
+        didSet { persistSettings() }
+    }
+
     // MARK: - Private
 
     private let shortcutsRepo = Repository<[TextShortcut]>(key: "textShortcuts.shortcuts")
@@ -37,6 +41,8 @@ final class TextShortcutsState {
         let settings = settingsRepo.load() ?? TextShortcutsSettings()
         self.opacity = settings.opacity
         self.alwaysOnTop = settings.alwaysOnTop
+        self.playSoundOnExpansion = settings.playSoundOnExpansion
+
         self.shortcuts = shortcutsRepo.load() ?? []
         self.isEnabled = enabledRepo.load() ?? false
         self.isAccessibilityGranted = KeystrokeMonitor.isAccessibilityGranted()
@@ -45,8 +51,11 @@ final class TextShortcutsState {
 
     // MARK: - Shortcut management
 
-    func addShortcut() {
-        shortcuts.append(TextShortcut())
+    @discardableResult
+    func addShortcut() -> TextShortcut {
+        let shortcut = TextShortcut()
+        shortcuts.append(shortcut)
+        return shortcut
     }
 
     func removeShortcut(_ shortcut: TextShortcut) {
@@ -88,6 +97,7 @@ final class TextShortcutsState {
     }
 
     private func updateMonitorNow() {
+        monitor.playSoundOnExpansion = playSoundOnExpansion
         if isEnabled && isAccessibilityGranted {
             monitor.start(shortcuts: shortcuts)
         } else {
@@ -100,6 +110,6 @@ final class TextShortcutsState {
     private func persistShortcuts() { shortcutsRepo.save(shortcuts) }
     private func persistEnabled() { enabledRepo.save(isEnabled) }
     private func persistSettings() {
-        settingsRepo.save(TextShortcutsSettings(opacity: opacity, alwaysOnTop: alwaysOnTop))
+        settingsRepo.save(TextShortcutsSettings(opacity: opacity, alwaysOnTop: alwaysOnTop, playSoundOnExpansion: playSoundOnExpansion))
     }
 }

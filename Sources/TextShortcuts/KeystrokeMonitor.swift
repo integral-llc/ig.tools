@@ -87,6 +87,7 @@ final class KeystrokeMonitor {
     private var context: KeystrokeMonitorContext?
     private var runLoopSource: CFRunLoopSource?
     private let buffer = KeystrokeBuffer()
+    var playSoundOnExpansion: Bool = true
 
     // MARK: - Accessibility
 
@@ -168,6 +169,10 @@ final class KeystrokeMonitor {
 
     private func expand(trigger: String, replacement: String) {
         buffer.setExpanding(true)
+
+        if playSoundOnExpansion {
+            NSSound(named: "Pop")?.play()
+        }
 
         // 1. Simulate backspaces to delete the trigger
         for _ in 0..<trigger.count {

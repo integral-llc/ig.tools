@@ -10,10 +10,16 @@ protocol Tool: Identifiable, Sendable {
     @MainActor var opacity: Double { get }
     /// Whether the tool window floats above all other windows.
     @MainActor var alwaysOnTop: Bool { get }
+    /// Optional custom default window size. Returns nil to use the global default.
+    @MainActor var defaultSize: CGSize? { get }
 
     @MainActor
     func makeView() -> AnyView
 
     @MainActor
     func makeSettingsView() -> AnyView
+}
+
+extension Tool {
+    var defaultSize: CGSize? { nil }
 }

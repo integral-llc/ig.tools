@@ -17,7 +17,7 @@ struct IGToolsApp: App {
             Divider()
 
             Button("About IG Tools") {
-                NSApp.orderFrontStandardAboutPanel(nil)
+                NSApp.orderFrontStandardAboutPanel(options: appDelegate.aboutPanelOptions)
                 NSApp.activate(ignoringOtherApps: true)
             }
 

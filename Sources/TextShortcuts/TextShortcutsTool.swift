@@ -13,6 +13,7 @@ struct TextShortcutsTool: Tool {
 
     var opacity: Double { state.opacity }
     var alwaysOnTop: Bool { state.alwaysOnTop }
+    var defaultSize: CGSize? { CGSize(width: 600, height: 440) }
 
     @MainActor
     func makeView() -> AnyView {

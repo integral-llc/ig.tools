@@ -51,8 +51,9 @@ final class ToolWindowManager {
         let hostingView = NSHostingView(rootView: contentView)
         hostingView.setFrameSize(hostingView.fittingSize)
 
+        let size = tool.defaultSize ?? defaultWindowSize
         let window = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: defaultWindowSize.width, height: defaultWindowSize.height),
+            contentRect: NSRect(x: 0, y: 0, width: size.width, height: size.height),
             styleMask: [.titled, .closable, .resizable, .nonactivatingPanel, .utilityWindow],
             backing: .buffered,
             defer: false

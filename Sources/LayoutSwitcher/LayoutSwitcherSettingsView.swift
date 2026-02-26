@@ -1,7 +1,7 @@
 import SwiftUI
 
-struct TextShortcutsSettingsView: View {
-    @Bindable var state: TextShortcutsState
+struct LayoutSwitcherSettingsView: View {
+    @Bindable var state: LayoutSwitcherState
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -20,10 +20,17 @@ struct TextShortcutsSettingsView: View {
 
             Divider()
 
+            Text("Detection")
+                .font(.headline)
+
+            Stepper("Min word length: \(state.minWordLength)", value: $state.minWordLength, in: 3...8)
+
+            Divider()
+
             Text("Feedback")
                 .font(.headline)
 
-            Toggle("Play sound on expansion", isOn: $state.playSoundOnExpansion)
+            Toggle("Play sound on switch", isOn: $state.playSoundOnSwitch)
         }
         .padding()
         .frame(width: 260)

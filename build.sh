@@ -45,4 +45,13 @@ if [ -d "Resources" ]; then
     fi
 fi
 
-echo "Done → ${BUNDLE_DIR}"
+# Install to /Applications if --install flag is passed
+if [[ "${1:-}" == "--install" ]]; then
+    echo "Installing to /Applications..."
+    rm -rf "/Applications/${APP_NAME}.app"
+    cp -R "${BUNDLE_DIR}" "/Applications/${APP_NAME}.app"
+    echo "Done → /Applications/${APP_NAME}.app"
+else
+    echo "Done → ${BUNDLE_DIR}"
+    echo "Run './build.sh --install' to copy to /Applications"
+fi
