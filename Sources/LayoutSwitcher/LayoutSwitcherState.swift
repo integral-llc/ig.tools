@@ -30,6 +30,7 @@ final class LayoutBuffer: @unchecked Sendable {
     private let lock = NSLock()
     private var buffer: String = ""
     private var _isExpanding: Bool = false
+    private var phraseHistory: [(word: String, boundary: Character)] = []
 
     var isExpanding: Bool {
         lock.lock(); defer { lock.unlock() }
@@ -44,6 +45,19 @@ final class LayoutBuffer: @unchecked Sendable {
     func clear() {
         lock.lock(); defer { lock.unlock() }
         buffer = ""
+        phraseHistory = []
+    }
+
+    func appendToHistory(word: String, boundary: Character) {
+        lock.lock(); defer { lock.unlock() }
+        phraseHistory.append((word: word, boundary: boundary))
+    }
+
+    func drainHistory() -> [(word: String, boundary: Character)] {
+        lock.lock(); defer { lock.unlock() }
+        let items = phraseHistory
+        phraseHistory = []
+        return items
     }
 
     /// Returns the current buffer contents and clears it, or nil if empty/expanding.
@@ -274,28 +288,66 @@ final class LayoutSwitcherState {
         if isRussian {
             let validRu = isValidWord(word, language: "ru")
             print("LayoutSwitcher: '\(word)' valid RU: \(validRu)")
-            guard !validRu else { return }
+            if validRu {
+                buffer.appendToHistory(word: word, boundary: boundary)
+                return
+            }
             guard let candidate = LayoutMap.mapRuToEn(word) else {
                 print("LayoutSwitcher: Failed to map '\(word)' RU→EN")
+                buffer.appendToHistory(word: word, boundary: boundary)
                 return
             }
             let validEn = isValidWord(candidate, language: "en")
             print("LayoutSwitcher: Mapped '\(word)' → '\(candidate)', valid EN: \(validEn)")
-            guard validEn else { return }
-            performSwitch(original: word, replacement: candidate, boundary: boundary, toRussian: false)
+            if !validEn {
+                buffer.appendToHistory(word: word, boundary: boundary)
+                return
+            }
         } else {
             let validEn = isValidWord(word, language: "en")
             print("LayoutSwitcher: '\(word)' valid EN: \(validEn)")
-            guard !validEn else { return }
+            if validEn {
+                buffer.appendToHistory(word: word, boundary: boundary)
+                return
+            }
             guard let candidate = LayoutMap.mapEnToRu(word) else {
                 print("LayoutSwitcher: Failed to map '\(word)' EN→RU")
+                buffer.appendToHistory(word: word, boundary: boundary)
                 return
             }
             let validRu = isValidWord(candidate, language: "ru")
             print("LayoutSwitcher: Mapped '\(word)' → '\(candidate)', valid RU: \(validRu)")
-            guard validRu else { return }
-            performSwitch(original: word, replacement: candidate, boundary: boundary, toRussian: true)
+            if !validRu {
+                buffer.appendToHistory(word: word, boundary: boundary)
+                return
+            }
         }
+
+        // Drain phrase history and build full original/replacement strings
+        let history = buffer.drainHistory()
+        let mapFunc: (String) -> String? = isRussian
+            ? { LayoutMap.mapRuToEn($0) }
+            : { LayoutMap.mapEnToRu($0) }
+
+        var fullOriginal = ""
+        var fullReplacement = ""
+
+        for item in history {
+            fullOriginal += item.word + String(item.boundary)
+            if let mapped = mapFunc(item.word) {
+                fullReplacement += mapped + String(item.boundary)
+            } else {
+                fullReplacement += item.word + String(item.boundary)
+            }
+        }
+
+        // Append the current triggering word (without boundary — performSwitch adds it)
+        fullOriginal += word
+        let currentMapped = mapFunc(word) ?? word
+        fullReplacement += currentMapped
+
+        print("LayoutSwitcher: Phrase switch: '\(fullOriginal)' → '\(fullReplacement)'")
+        performSwitch(original: fullOriginal, replacement: fullReplacement, boundary: boundary, toRussian: !isRussian)
     }
 
     private func isValidWord(_ word: String, language: String) -> Bool {
@@ -322,7 +374,7 @@ final class LayoutSwitcherState {
             NSSound(named: "Pop")?.play()
         }
 
-        // Delete the original word + boundary character
+        // Delete the original text (may include multiple words with boundaries) + final boundary character
         let deleteCount = original.count + 1
         for _ in 0..<deleteCount {
             postKey(keyCode: CGKeyCode(kVK_Delete), keyDown: true)
@@ -356,6 +408,7 @@ final class LayoutSwitcherState {
                         pasteboard.setString(saved, forType: .string)
                     }
                     self?.buffer.setExpanding(false)
+                    self?.buffer.clear()
 
                     // Log the switch
                     Task { @MainActor in
