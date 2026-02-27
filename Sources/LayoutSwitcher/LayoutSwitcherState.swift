@@ -48,6 +48,14 @@ final class LayoutBuffer: @unchecked Sendable {
         phraseHistory = []
     }
 
+    /// Clears only the current word buffer, preserving phrase history.
+    /// Used when the input source changes (which can be triggered spuriously
+    /// by NSSpellChecker) — we don't want to lose accumulated phrase context.
+    func clearCurrentWord() {
+        lock.lock(); defer { lock.unlock() }
+        buffer = ""
+    }
+
     func appendToHistory(word: String, boundary: Character) {
         lock.lock(); defer { lock.unlock() }
         phraseHistory.append((word: word, boundary: boundary))
@@ -161,13 +169,15 @@ final class LayoutSwitcherState {
         self.recentSwitches = switchesRepo.load() ?? []
         self.isAccessibilityGranted = KeystrokeMonitor.isAccessibilityGranted()
 
-        // Listen for manual layout changes to clear buffer
+        // Listen for layout changes — only clear current word buffer, not phrase history.
+        // NSSpellChecker.checkSpelling(language:) can trigger spurious layout notifications
+        // that would wipe accumulated phrase context needed for multi-word conversion.
         inputSourceObserver = DistributedNotificationCenter.default().addObserver(
             forName: NSNotification.Name(kTISNotifySelectedKeyboardInputSourceChanged as String),
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.buffer.clear()
+            self?.buffer.clearCurrentWord()
         }
 
         updateMonitorNow()
