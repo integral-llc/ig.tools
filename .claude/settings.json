@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(defaults read com.ig.tools)",
+      "Bash(defaults read com.ig.tools \"layoutSwitcher.recentSwitches\")",
+      "Bash(kill 70701)"
+    ]
+  }
+}

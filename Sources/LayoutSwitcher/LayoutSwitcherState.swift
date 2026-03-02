@@ -286,51 +286,22 @@ final class LayoutSwitcherState {
 
     private func handleWordComplete(word: String, boundary: Character) {
         print("LayoutSwitcher: Word complete: '\(word)' boundary='\(boundary)' len=\(word.count) min=\(minWordLength)")
-        guard word.count >= minWordLength else {
-            print("LayoutSwitcher: Skipping — word too short")
-            return
+        // Allow words shorter than minWordLength if LanguageHints can identify the mapped word
+        if word.count < minWordLength {
+            if word.count < 3 || !hasHintForMappedWord(word) {
+                print("LayoutSwitcher: Skipping — word too short")
+                return
+            }
+            print("LayoutSwitcher: Short word '\(word)' — proceeding (hint match on mapped word)")
         }
 
         let isRussian = InputSourceManager.isRussianLayout()
         let sourceID = InputSourceManager.currentInputSourceID() ?? "unknown"
         print("LayoutSwitcher: Current layout: \(isRussian ? "RU" : "EN") (\(sourceID))")
 
-        if isRussian {
-            let validRu = isValidWord(word, language: "ru")
-            print("LayoutSwitcher: '\(word)' valid RU: \(validRu)")
-            if validRu {
-                buffer.appendToHistory(word: word, boundary: boundary)
-                return
-            }
-            guard let candidate = LayoutMap.mapRuToEn(word) else {
-                print("LayoutSwitcher: Failed to map '\(word)' RU→EN")
-                buffer.appendToHistory(word: word, boundary: boundary)
-                return
-            }
-            let validEn = isValidWord(candidate, language: "en")
-            print("LayoutSwitcher: Mapped '\(word)' → '\(candidate)', valid EN: \(validEn)")
-            if !validEn {
-                buffer.appendToHistory(word: word, boundary: boundary)
-                return
-            }
-        } else {
-            let validEn = isValidWord(word, language: "en")
-            print("LayoutSwitcher: '\(word)' valid EN: \(validEn)")
-            if validEn {
-                buffer.appendToHistory(word: word, boundary: boundary)
-                return
-            }
-            guard let candidate = LayoutMap.mapEnToRu(word) else {
-                print("LayoutSwitcher: Failed to map '\(word)' EN→RU")
-                buffer.appendToHistory(word: word, boundary: boundary)
-                return
-            }
-            let validRu = isValidWord(candidate, language: "ru")
-            print("LayoutSwitcher: Mapped '\(word)' → '\(candidate)', valid RU: \(validRu)")
-            if !validRu {
-                buffer.appendToHistory(word: word, boundary: boundary)
-                return
-            }
+        if !shouldSwitch(word: word, isRussian: isRussian) {
+            buffer.appendToHistory(word: word, boundary: boundary)
+            return
         }
 
         // Drain phrase history and build full original/replacement strings
@@ -358,6 +329,74 @@ final class LayoutSwitcherState {
 
         print("LayoutSwitcher: Phrase switch: '\(fullOriginal)' → '\(fullReplacement)'")
         performSwitch(original: fullOriginal, replacement: fullReplacement, boundary: boundary, toRussian: !isRussian)
+    }
+
+    /// Returns true if the mapped version of the word is recognized by LanguageHints.
+    /// Used to bypass minWordLength for short but confidently-identified words.
+    private func hasHintForMappedWord(_ word: String) -> Bool {
+        let isRussian = InputSourceManager.isRussianLayout()
+        let mapped: String?
+        if isRussian {
+            mapped = LayoutMap.mapRuToEn(word)
+        } else {
+            mapped = LayoutMap.mapEnToRu(word)
+        }
+        guard let m = mapped else { return false }
+        return isRussian
+            ? LanguageHints.isLikelyEnglish(m)
+            : LanguageHints.isLikelyRussian(m)
+    }
+
+    /// Determines whether the typed word should trigger a layout switch.
+    /// Uses LanguageHints as authoritative for short/common words, overriding
+    /// spell checker false positives on gibberish.
+    private func shouldSwitch(word: String, isRussian: Bool) -> Bool {
+        let currentLang = isRussian ? "ru" : "en"
+        let otherLang = isRussian ? "en" : "ru"
+        let hintCurrent = isRussian
+            ? LanguageHints.isLikelyRussian(word)
+            : LanguageHints.isLikelyEnglish(word)
+
+        // If LanguageHints confirms the word belongs to current language, no switch
+        if hintCurrent {
+            print("LayoutSwitcher: '\(word)' confirmed by hints as \(currentLang) — no switch")
+            return false
+        }
+
+        // Map the word to the other layout
+        let candidate: String?
+        if isRussian {
+            candidate = LayoutMap.mapRuToEn(word)
+        } else {
+            candidate = LayoutMap.mapEnToRu(word)
+        }
+
+        guard let mapped = candidate else {
+            print("LayoutSwitcher: Failed to map '\(word)' — no switch")
+            return false
+        }
+
+        let hintOther = isRussian
+            ? LanguageHints.isLikelyEnglish(mapped)
+            : LanguageHints.isLikelyRussian(mapped)
+
+        // If LanguageHints recognizes the mapped version, switch
+        // (overrides spell checker false positives on the original)
+        if hintOther {
+            print("LayoutSwitcher: '\(word)' → '\(mapped)' confirmed by hints as \(otherLang) — switching")
+            return true
+        }
+
+        // Fall back to spell checker
+        let spellCurrent = isValidWord(word, language: currentLang)
+        if spellCurrent {
+            print("LayoutSwitcher: '\(word)' valid \(currentLang) by spell check — no switch")
+            return false
+        }
+
+        let spellOther = isValidWord(mapped, language: otherLang)
+        print("LayoutSwitcher: '\(word)' → '\(mapped)', spell check \(otherLang): \(spellOther)")
+        return spellOther
     }
 
     private func isValidWord(_ word: String, language: String) -> Bool {
