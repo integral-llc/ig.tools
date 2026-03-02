@@ -4,13 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-IG Tools is a macOS 14+ menu bar application built with SwiftUI that provides floating utility tools. Currently features a calculator with expression parsing, variable management, and history tracking. Uses Swift 6 strict concurrency.
+IG Tools is a macOS 14+ menu bar application built with SwiftUI that provides floating utility tools. Features a calculator (expression parsing, variables, history), a layout switcher (auto-detects wrong EN/RU keyboard layout and corrects typed text), and text shortcuts (expand abbreviations). Uses Swift 6 strict concurrency.
 
 ## Build and Run
 
 ```bash
 swift build -c release          # Build with SwiftPM
 ./build.sh                      # Build .app bundle (into build/IG Tools.app)
+./build.sh --install            # Build and copy to /Applications
 ./.build/release/IGTools        # Run after SwiftPM build
 open "build/IG Tools.app"       # Run after build.sh
 
@@ -19,7 +20,7 @@ swift test --filter LexerTests                  # Run a test suite
 swift test --filter "LexerTests/basicTokens"    # Run a single test
 ```
 
-Test suites: `LexerTests`, `ParserTests`, `EvaluatorTests`, `CalculatorIntegrationTests`, `PercentageVariableTests`
+Test suites: `LexerTests`, `ParserTests`, `EvaluatorTests`, `CalculatorIntegrationTests`, `PercentageVariableTests`, `LanguageHintsTests`, `LayoutSwitcherPipelineTests`
 
 Tests use **Swift Testing** framework (`@Test`, `@Suite`, `#expect`), not XCTest.
 
@@ -48,6 +49,20 @@ The calculator follows a classic **Lexer → Parser → Evaluator** pipeline:
 - Standalone: `30%` → `0.3`
 - Trailing: `5 + 30%` → `6.5` (adds 30% of 5)
 - Variables track percentage type via `VariableValue` enum (`.number` vs `.percentage`), displayed as `30%` but stored as `0.3`
+
+### Layout Switcher
+Detects when text is typed on the wrong keyboard layout (EN↔RU) and auto-replaces it.
+
+- **Event monitoring**: CGEvent tap captures keystrokes at HID level (`LayoutSwitcherState`)
+- **Buffer**: `LayoutBuffer` accumulates characters until a word boundary (space, punctuation)
+- **Detection priority** (in `shouldSwitch`):
+  1. `LanguageHints` confirms word in current language → no switch (highest confidence)
+  2. `LanguageHints` confirms mapped word in other language → switch (overrides spell checker)
+  3. `NSSpellChecker` fallback for words not in hints tables
+- **LanguageHints** (`Sources/LayoutSwitcher/LanguageHints.swift`): curated tables of ~60 common words + ~20 trigram prefixes per language, used as authoritative fallback when spell checker fails on short/common words
+- **LayoutMap** (`Sources/LayoutSwitcher/LayoutMap.swift`): physical key position mapping between QWERTY↔ЙЦУКЕН
+- **minWordLength bypass**: words shorter than `minWordLength` setting are still processed if `LanguageHints` can identify the mapped word (e.g., 3-char "nfr"→"так" works even with minWordLength=4)
+- **Text replacement**: deletes original via simulated Delete keypresses, pastes replacement via clipboard, then switches input source
 
 ### Persistence
 `Repository<T: Codable>` (`Sources/Core/Persistence.swift`) — generic JSON-encoded `UserDefaults` storage. Used for history, variables, memory, settings, and window frames.

@@ -9,6 +9,9 @@ swift build -c release
 
 # Or use the build script to create a .app bundle
 ./build.sh
+
+# Build and install to /Applications
+./build.sh --install
 ```
 
 ### Test Commands
@@ -22,6 +25,8 @@ swift test --filter ParserTests
 swift test --filter EvaluatorTests
 swift test --filter CalculatorIntegrationTests
 swift test --filter PercentageVariableTests
+swift test --filter LanguageHintsTests
+swift test --filter LayoutSwitcherPipelineTests
 
 # Run a specific test
 swift test --filter "LexerTests/basicTokens"
@@ -97,6 +102,12 @@ open "build/IG Tools.app"
 2. Parser (Sources/Calculator/Parser/): Builds AST from tokens
 3. Evaluator (Sources/Calculator/Evaluator/): Evaluates AST nodes
 4. State Management (CalculatorState.swift): Manages state, history, variables, memory
+
+### Layout Switcher Components
+1. LayoutSwitcherState (Sources/LayoutSwitcher/): CGEvent tap + word detection logic
+2. LayoutMap (Sources/LayoutSwitcher/LayoutMap.swift): QWERTY↔ЙЦУКЕН key mapping
+3. LanguageHints (Sources/LayoutSwitcher/LanguageHints.swift): Curated word/prefix tables for language detection
+4. InputSourceManager (Sources/LayoutSwitcher/InputSourceManager.swift): macOS TIS API for layout switching
 
 ### Persistence
 - All state persisted to UserDefaults via Repository class
