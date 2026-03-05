@@ -46,10 +46,9 @@ struct ClothSimulatorTests {
         let rows = 4
         let cloth = ClothState(columns: cols, rows: rows, spacing: 10, origin: SIMD2(0, 0))
 
-        let horizontal = rows * (cols - 1)           // 16
-        let vertical = (rows - 1) * cols             // 15
-        let shear = 2 * (rows - 1) * (cols - 1)     // 24
-        let expected = horizontal + vertical + shear // 55
+        let horizontal = rows * (cols - 1)              // 16
+        let vertical = (rows - 1) * cols               // 15
+        let expected = horizontal + vertical           // 31 (structural only, no shear)
 
         #expect(cloth.constraints.count == expected)
     }

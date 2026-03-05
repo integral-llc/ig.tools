@@ -33,9 +33,9 @@ final class ClothState {
 
     var draggedParticleIndex: Int?
 
-    private let gravity: SIMD2<Float> = SIMD2(0, 980)
-    private let damping: Float = 0.99
-    private let constraintIterations: Int = 5
+    private let gravity: SIMD2<Float> = SIMD2(0, 500)
+    private let damping: Float = 0.98
+    private let constraintIterations: Int = 3
 
     init(columns: Int, rows: Int, spacing: Float, origin: SIMD2<Float>) {
         self.columns = columns
@@ -53,28 +53,16 @@ final class ClothState {
         }
         self.particles = builtParticles
 
-        // Build constraints: structural (horizontal + vertical) + shear (diagonal)
+        // Build structural constraints only (no shear — gives soft, drapey cloth)
         var builtConstraints: [Constraint] = []
-        let diagonalLength = spacing * sqrt(2)
         for row in 0..<rows {
             for col in 0..<columns {
                 let idx = row * columns + col
-                // Horizontal
                 if col < columns - 1 {
                     builtConstraints.append(Constraint(indexA: idx, indexB: idx + 1, restLength: spacing))
                 }
-                // Vertical
                 if row < rows - 1 {
                     builtConstraints.append(Constraint(indexA: idx, indexB: idx + columns, restLength: spacing))
-                }
-                // Shear diagonals
-                if col < columns - 1 && row < rows - 1 {
-                    builtConstraints.append(Constraint(
-                        indexA: idx, indexB: idx + columns + 1, restLength: diagonalLength
-                    ))
-                    builtConstraints.append(Constraint(
-                        indexA: idx + 1, indexB: idx + columns, restLength: diagonalLength
-                    ))
                 }
             }
         }

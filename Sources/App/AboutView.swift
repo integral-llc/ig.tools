@@ -6,10 +6,10 @@ struct AboutView: View {
     let version: String
 
     @State private var cloth = ClothState(
-        columns: 15,
-        rows: 12,
-        spacing: 12,
-        origin: SIMD2(10, 10)
+        columns: 14,
+        rows: 25,
+        spacing: 14,
+        origin: SIMD2(8, 8)
     )
 
     var body: some View {
