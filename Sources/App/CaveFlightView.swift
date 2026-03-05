@@ -3,10 +3,14 @@ import SwiftUI
 struct CaveFlightView: View {
     @State private var time: Double = 0
 
-    private let ringCount = 20
-    private let sides = 8
-    private let flySpeed: Double = 0.8
-    private let turnAmplitude: Double = 0.15
+    private let segmentCount = 28
+    private let segmentSpacing: Double = 1.5
+    private let sides = 6
+    private let baseRadius: Double = 2.2
+    private let focalLength: Double = 200.0
+    private let speed: Double = 3.5
+    private let turnFreq: Double = 0.07
+    private let turnAmp: Double = 2.8
 
     var body: some View {
         TimelineView(.animation) { timeline in
@@ -24,100 +28,140 @@ struct CaveFlightView: View {
     private func drawTunnel(context: GraphicsContext, size: CGSize) {
         let cx = size.width / 2
         let cy = size.height / 2
-        let maxRadius = max(size.width, size.height) * 0.75
+        let cameraZ = time * speed
 
-        // Scroll phase — rings continuously stream toward viewer
-        let scroll = fmod(time * flySpeed, 1.0)
+        // Camera follows the tunnel path
+        let camX = pathX(cameraZ)
+        let camY = pathY(cameraZ)
 
-        // Build ring data from far (small) to near (large)
-        var rings: [(poly: Path, depth: Double)] = []
+        // Look-ahead steering — camera rotates toward where the path goes
+        let lookAhead: Double = 8
+        let lookDirX = pathX(cameraZ + lookAhead) - camX
+        let lookDirY = pathY(cameraZ + lookAhead) - camY
 
-        for i in 0...ringCount {
-            // Depth: 0 = vanishing point, 1 = camera
-            let rawDepth = (Double(i) + scroll) / Double(ringCount)
-            let depth = min(rawDepth, 1.0)
-
-            // Exponential scaling for perspective
-            let scale = depth * depth
-            let radius = maxRadius * scale
-
-            // Tunnel center drifts with noise for turns
-            let depthSeed = Double(i) + floor(time * flySpeed)
-            let offsetX = noise1D(depthSeed * 0.3 + 10) * size.width * turnAmplitude * depth
-            let offsetY = noise1D(depthSeed * 0.3 + 50) * size.height * turnAmplitude * depth
-
-            let centerX = cx + offsetX
-            let centerY = cy + offsetY
-
-            let poly = caveRing(
-                center: CGPoint(x: centerX, y: centerY),
-                radius: radius,
-                seed: depthSeed
-            )
-            rings.append((poly: poly, depth: depth))
-        }
-
-        // Fill background (the void beyond the tunnel)
+        // Background: black void
         context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.black))
 
-        // Draw from far to near: fill the wall between consecutive rings
-        for i in 0..<rings.count - 1 {
-            let outerRing = rings[i + 1]
-            let innerRing = rings[i]
+        // Generate projected cross-sections from camera forward
+        let firstWorldZ = (floor(cameraZ / segmentSpacing) + 1) * segmentSpacing
 
-            // Wall shape = outer minus inner (even-odd fill)
-            var wallPath = outerRing.poly
-            wallPath.addPath(innerRing.poly)
+        var sections: [(points: [CGPoint], viewZ: Double, worldZ: Double)] = []
 
-            let depth = outerRing.depth
-            let hue = fmod(depth * 1.5 + time * 0.08, 1.0)
-            let brightness = 0.15 + depth * 0.45
-            let saturation = 0.5 + depth * 0.3
+        for i in 0...segmentCount {
+            let worldZ = firstWorldZ + Double(i) * segmentSpacing
+            let viewZ = worldZ - cameraZ
+            guard viewZ > 0.3 else { continue }
 
-            context.fill(
-                wallPath,
-                with: .color(Color(hue: hue, saturation: saturation, brightness: brightness)),
-                style: FillStyle(eoFill: true)
-            )
+            let tunnelCx = pathX(worldZ)
+            let tunnelCy = pathY(worldZ)
 
-            // Edge line on inner ring for rocky definition
-            let lineOpacity = 0.1 + depth * 0.3
-            context.stroke(
-                innerRing.poly,
-                with: .color(.white.opacity(lineOpacity)),
-                lineWidth: 0.5
-            )
+            // View-space with look-ahead rotation (small-angle approx)
+            let relX = (tunnelCx - camX) - lookDirX * (viewZ / lookAhead)
+            let relY = (tunnelCy - camY) - lookDirY * (viewZ / lookAhead)
+
+            let scale = focalLength / viewZ
+
+            var projected: [CGPoint] = []
+            for s in 0..<sides {
+                // π/6 rotation gives flat bottom edge (mine floor)
+                let angle = Double(s) / Double(sides) * .pi * 2 + .pi / 6
+                let rockNoise = 1.0 + noise1D(worldZ * 0.5 + Double(s) * 4.3) * 0.22
+                let r = baseRadius * rockNoise
+
+                let vx = relX + cos(angle) * r
+                let vy = relY + sin(angle) * r
+
+                projected.append(CGPoint(x: cx + vx * scale, y: cy + vy * scale))
+            }
+            sections.append((projected, viewZ, worldZ))
         }
 
-        // Subtle crosshair / HUD dot at center
-        let dotSize: CGFloat = 3
-        let dotRect = CGRect(x: cx - dotSize / 2, y: cy - dotSize / 2, width: dotSize, height: dotSize)
-        context.fill(Ellipse().path(in: dotRect), with: .color(.white.opacity(0.25)))
-    }
+        // Draw wall quads back-to-front (painter's algorithm)
+        for i in stride(from: sections.count - 2, through: 0, by: -1) {
+            let far = sections[i + 1]
+            let near = sections[i]
 
-    // MARK: - Cave ring geometry
+            for s in 0..<sides {
+                let ns = (s + 1) % sides
 
-    private func caveRing(center: CGPoint, radius: Double, seed: Double) -> Path {
-        var path = Path()
-        for s in 0...sides {
-            let angle = Double(s) / Double(sides) * .pi * 2
+                var quad = Path()
+                quad.move(to: far.points[s])
+                quad.addLine(to: far.points[ns])
+                quad.addLine(to: near.points[ns])
+                quad.addLine(to: near.points[s])
+                quad.closeSubpath()
 
-            // Noise-based vertex displacement for rocky walls
-            let noiseVal = noise1D(seed * 2.7 + Double(s) * 1.3)
-            let displacement = 1.0 + noiseVal * 0.25
-            let r = radius * displacement
+                // Headlight: inverse-square falloff from camera
+                let avgZ = (far.viewZ + near.viewZ) / 2
+                let headlight = 1.0 / (1.0 + avgZ * avgZ * 0.008)
 
-            let x = center.x + cos(angle) * r
-            let y = center.y + sin(angle) * r
+                // Face-dependent shading (top faces brightest → overhead lamp feel)
+                let faceAngle = Double(s) / Double(sides) * .pi * 2 + .pi / 6
+                let faceLighting = 0.3 + 0.7 * max(0, -sin(faceAngle))
 
-            if s == 0 {
-                path.move(to: CGPoint(x: x, y: y))
-            } else {
-                path.addLine(to: CGPoint(x: x, y: y))
+                var brightness = headlight * faceLighting * 0.8
+
+                // Rock wall color: warm brown/gray
+                var hue = 0.07 + noise1D(far.worldZ * 0.15 + Double(s) * 2) * 0.04
+                var sat = 0.25 + headlight * 0.15
+
+                // Mining lights: occasional amber glow panels
+                let segIdx = Int(round(far.worldZ / segmentSpacing))
+                if segIdx % 6 == 0 && s == 1 {
+                    hue = 0.12
+                    sat = 0.8
+                    brightness = min(brightness * 2.5, 0.9)
+                }
+
+                context.fill(quad, with: .color(Color(
+                    hue: hue, saturation: sat, brightness: max(0.02, brightness)
+                )))
+
+                // Polygon edge wireframe (retro 3D look)
+                let edgeAlpha = headlight * 0.35
+                context.stroke(quad, with: .color(.white.opacity(edgeAlpha)), lineWidth: 0.8)
             }
         }
-        path.closeSubpath()
-        return path
+
+        // HUD crosshair
+        drawCrosshair(context: context, cx: cx, cy: cy)
+    }
+
+    // MARK: - Tunnel path (layered noise for organic turns)
+
+    private func pathX(_ z: Double) -> Double {
+        noise1D(z * turnFreq) * turnAmp
+            + noise1D(z * turnFreq * 0.4 + 200) * turnAmp * 0.6
+    }
+
+    private func pathY(_ z: Double) -> Double {
+        noise1D(z * turnFreq + 100) * turnAmp * 0.6
+            + noise1D(z * turnFreq * 0.3 + 300) * turnAmp * 0.3
+    }
+
+    // MARK: - HUD
+
+    private func drawCrosshair(context: GraphicsContext, cx: Double, cy: Double) {
+        let gap: Double = 3
+        let arm: Double = 7
+
+        var path = Path()
+        path.move(to: CGPoint(x: cx - gap - arm, y: cy))
+        path.addLine(to: CGPoint(x: cx - gap, y: cy))
+        path.move(to: CGPoint(x: cx + gap, y: cy))
+        path.addLine(to: CGPoint(x: cx + gap + arm, y: cy))
+        path.move(to: CGPoint(x: cx, y: cy - gap - arm))
+        path.addLine(to: CGPoint(x: cx, y: cy - gap))
+        path.move(to: CGPoint(x: cx, y: cy + gap))
+        path.addLine(to: CGPoint(x: cx, y: cy + gap + arm))
+
+        context.stroke(path, with: .color(.green.opacity(0.5)), lineWidth: 1)
+
+        let dotR: Double = 1.5
+        context.fill(
+            Ellipse().path(in: CGRect(x: cx - dotR, y: cy - dotR, width: dotR * 2, height: dotR * 2)),
+            with: .color(.green.opacity(0.5))
+        )
     }
 
     // MARK: - Noise
