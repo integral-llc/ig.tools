@@ -7,6 +7,7 @@ enum AboutEffect: Int, CaseIterable {
     case sineWave
     case dnaHelix
     case fractalTree
+    case caveFlight
 
     var label: String {
         switch self {
@@ -16,6 +17,7 @@ enum AboutEffect: Int, CaseIterable {
         case .sineWave: "Sine Wave"
         case .dnaHelix: "DNA Helix"
         case .fractalTree: "Fractal Tree"
+        case .caveFlight: "Cave Flight"
         }
     }
 }
@@ -83,6 +85,8 @@ struct AboutView: View {
                     DNAHelixView()
                 case .fractalTree:
                     FractalTreeView()
+                case .caveFlight:
+                    CaveFlightView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
