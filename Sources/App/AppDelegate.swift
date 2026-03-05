@@ -8,7 +8,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let textShortcutsState = TextShortcutsState()
     let layoutSwitcherState = LayoutSwitcherState()
     private var accessibilityPanel: NSPanel?
-    private(set) var aboutPanelOptions: [NSApplication.AboutPanelOptionKey: Any] = [:]
+    private(set) var appIcon: NSImage = NSImage()
+    private(set) var appVersion: String = ""
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -21,21 +22,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             showAccessibilityPrompt()
         }
 
-        // Prepare About panel options (shown later when user clicks "About")
+        // Prepare About window data
+        appIcon = NSImage(named: "AppIcon")
+            ?? NSApp.applicationIconImage
+            ?? NSImage(systemSymbolName: "function", accessibilityDescription: nil)
+            ?? NSImage()
+
         if let infoDict = Bundle.main.infoDictionary {
             let version = infoDict["CFBundleShortVersionString"] as? String ?? "Unknown"
             let build = infoDict["CFBundleVersion"] as? String ?? "Unknown"
-
-            let appIcon = NSImage(named: "AppIcon")
-                ?? NSApp.applicationIconImage
-                ?? NSImage(systemSymbolName: "function", accessibilityDescription: nil)
-                ?? NSImage()
-
-            aboutPanelOptions = [
-                .applicationVersion: "Version \(version) (\(build))",
-                .applicationName: "IG Tools",
-                .applicationIcon: appIcon
-            ]
+            appVersion = "Version \(version) (\(build))"
         }
     }
 

@@ -17,8 +17,11 @@ struct IGToolsApp: App {
             Divider()
 
             Button("About IG Tools") {
-                NSApp.orderFrontStandardAboutPanel(options: appDelegate.aboutPanelOptions)
-                NSApp.activate(ignoringOtherApps: true)
+                AboutWindow.shared.show(
+                    appIcon: appDelegate.appIcon,
+                    appName: "IG Tools",
+                    version: appDelegate.appVersion
+                )
             }
 
             Button("Quit") {
