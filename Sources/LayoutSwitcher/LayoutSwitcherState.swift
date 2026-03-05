@@ -83,7 +83,9 @@ final class LayoutBuffer: @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         guard !_isExpanding else { return nil }
 
-        let wordBoundaries: Set<Character> = [" ", "\n", "\t", ".", ",", "!", "?", ";", ":", "(", ")"]
+        // Note: ";" is intentionally excluded — it maps to "ж" on ЙЦУКЕН,
+        // so it must be treated as part of a word (e.g., "vj;yj" → "можно").
+        let wordBoundaries: Set<Character> = [" ", "\n", "\t", ".", ",", "!", "?", ":", "(", ")"]
 
         if wordBoundaries.contains(char) {
             let word = buffer

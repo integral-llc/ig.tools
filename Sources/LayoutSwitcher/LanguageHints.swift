@@ -26,6 +26,9 @@ enum LanguageHints {
         // Common nouns
         "мир", "лес", "ход", "вид", "ряд", "суд",
         "рот", "сон", "путь", "друг",
+        // Words with ж (typed as ; on QWERTY — must not be split by word boundary)
+        "можно", "нужно", "каждый", "между",
+        "нож", "муж", "ложь", "кожа",
     ]
 
     // MARK: - English common words (Latin, lowercased)
@@ -36,7 +39,10 @@ enum LanguageHints {
         "all", "can", "had", "her", "was", "one", "our",
         "out", "has", "his", "how", "its", "may", "new",
         "now", "old", "see", "way", "who", "did", "get",
-        "let", "say", "she", "too", "use",
+        "let", "say", "she", "too", "use", "why", "any",
+        "own", "try", "run", "set", "yet", "big", "got",
+        "him", "man", "put", "two", "far", "ago", "day",
+        "few", "end", "ask", "top", "lot",
         // Common short verbs/words
         "been", "come", "each", "from", "good", "have",
         "help", "here", "just", "like", "long", "make",

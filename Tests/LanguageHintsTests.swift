@@ -118,6 +118,22 @@ struct LanguageHintsTests {
         #expect(LanguageHints.isLikelyEnglish("who"))
     }
 
+    @Test("Recognizes 'why' as English")
+    func whyIsEnglish() {
+        #expect(LanguageHints.isLikelyEnglish("why"))
+        #expect(LanguageHints.isLikelyEnglish("Why"))
+    }
+
+    @Test("Recognizes Russian words containing ж")
+    func russianWordsWithZhe() {
+        #expect(LanguageHints.isLikelyRussian("можно"))
+        #expect(LanguageHints.isLikelyRussian("нужно"))
+        #expect(LanguageHints.isLikelyRussian("каждый"))
+        #expect(LanguageHints.isLikelyRussian("между"))
+        #expect(LanguageHints.isLikelyRussian("нож"))
+        #expect(LanguageHints.isLikelyRussian("муж"))
+    }
+
     @Test("Prefix matching requires at least 3 characters")
     func prefixMinLength() {
         #expect(!LanguageHints.isLikelyRussian("та"))

@@ -261,6 +261,55 @@ struct LayoutSwitcherPipelineTests {
         #expect(passes == true)
     }
 
+    // MARK: - Semicolon as ж (not a word boundary)
+
+    @Test("Semicolon is NOT a word boundary — 'vj;yj' stays as one word")
+    func semicolonNotBoundary() {
+        let result = simulateTyping("vj;yj")
+        #expect(result?.word == "vj;yj")
+    }
+
+    @Test("Type 'vj;yj' on EN → maps to 'можно' → switch")
+    func pipelineMozhno() {
+        let result = simulateTyping("vj;yj")
+        #expect(result?.word == "vj;yj")
+
+        let mapped = LayoutMap.mapEnToRu("vj;yj")
+        #expect(mapped == "можно")
+
+        let decision = shouldSwitchViaHints(word: "vj;yj", isRussianLayout: false)
+        #expect(decision.shouldSwitch == true)
+        #expect(decision.mapped == "можно")
+    }
+
+    @Test("Type 'ye;yj' on EN → maps to 'нужно' → switch")
+    func pipelineNuzhno() {
+        let result = simulateTyping("ye;yj")
+        #expect(result?.word == "ye;yj")
+
+        let decision = shouldSwitchViaHints(word: "ye;yj", isRussianLayout: false)
+        #expect(decision.shouldSwitch == true)
+        #expect(decision.mapped == "нужно")
+    }
+
+    // MARK: - 'why' detection (црн on RU layout)
+
+    @Test("Type 'црн' on RU → maps to 'why' → switch")
+    func pipelineWhyDetection() {
+        let result = simulateTyping("црн")
+        #expect(result?.word == "црн")
+
+        let decision = shouldSwitchViaHints(word: "црн", isRussianLayout: true)
+        #expect(decision.shouldSwitch == true)
+        #expect(decision.mapped == "why")
+    }
+
+    @Test("'црн' bypasses minWordLength=4 because mapped 'why' is in hints")
+    func minLengthBypassWhy() {
+        let passes = passesLengthGate(word: "црн", minWordLength: 4, isRussianLayout: true)
+        #expect(passes == true)
+    }
+
     // MARK: - Multi-word phrase simulation
 
     @Test("Two words typed sequentially accumulate in phrase history")
