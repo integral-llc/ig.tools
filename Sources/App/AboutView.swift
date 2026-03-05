@@ -3,11 +3,19 @@ import SwiftUI
 enum AboutEffect: Int, CaseIterable {
     case cloth
     case blob
+    case constellation
+    case sineWave
+    case dnaHelix
+    case fractalTree
 
     var label: String {
         switch self {
         case .cloth: "Cloth"
         case .blob: "Blob"
+        case .constellation: "Constellation"
+        case .sineWave: "Sine Wave"
+        case .dnaHelix: "DNA Helix"
+        case .fractalTree: "Fractal Tree"
         }
     }
 }
@@ -67,6 +75,14 @@ struct AboutView: View {
                     ClothView(cloth: cloth)
                 case .blob:
                     MorphingBlobView()
+                case .constellation:
+                    ParticleConstellationView()
+                case .sineWave:
+                    SineWaveInkBleedView()
+                case .dnaHelix:
+                    DNAHelixView()
+                case .fractalTree:
+                    FractalTreeView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
