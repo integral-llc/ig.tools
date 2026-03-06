@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let calcState = CalculatorState()
     let textShortcutsState = TextShortcutsState()
     let layoutSwitcherState = LayoutSwitcherState()
+    let ytTranscriberState = YouTubeTranscriberState()
     private var accessibilityPanel: NSPanel?
     private(set) var appIcon: NSImage = NSImage()
     private(set) var appVersion: String = ""
@@ -16,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         registry.register(CalculatorTool(state: calcState))
         registry.register(TextShortcutsTool(state: textShortcutsState))
         registry.register(LayoutSwitcherTool(state: layoutSwitcherState))
+        registry.register(YouTubeTranscriberTool(state: ytTranscriberState))
 
         // Prompt for accessibility permissions if not yet granted
         if !KeystrokeMonitor.isAccessibilityGranted() {
