@@ -65,3 +65,6 @@ Pods/
 # Carthage (if used)
 Carthage/Build/
 Carthage/Checkouts/
+
+# Local task notes
+task.md
